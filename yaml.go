@@ -86,7 +86,13 @@ type Marshaler interface {
 // supported tag options.
 //
 func Unmarshal(in []byte, out interface{}) (err error) {
-	return unmarshal(in, out, false)
+	return unmarshal(in, out, false, false)
+}
+
+// UnmarshalJSON is like Unmarshal however it will attempt to use the "json" tag
+// if it exists when the "yaml" tag does not
+func UnmarshalJSON(in []byte, out interface{}) (err error) {
+	return unmarshal(in, out, false, true)
 }
 
 // A Decoder reads and decodes YAML values from an input stream.
@@ -161,9 +167,10 @@ func (n *Node) Decode(v interface{}) (err error) {
 	return nil
 }
 
-func unmarshal(in []byte, out interface{}, strict bool) (err error) {
+func unmarshal(in []byte, out interface{}, strict bool, json bool) (err error) {
 	defer handleErr(&err)
 	d := newDecoder()
+	d.json = json
 	p := newParser(in)
 	defer p.destroy()
 	node := p.parse()
@@ -226,6 +233,19 @@ func unmarshal(in []byte, out interface{}, strict bool) (err error) {
 func Marshal(in interface{}) (out []byte, err error) {
 	defer handleErr(&err)
 	e := newEncoder()
+	defer e.destroy()
+	e.marshalDoc("", reflect.ValueOf(in))
+	e.finish()
+	out = e.out
+	return
+}
+
+// MarshalJSON is like Marshal however it will attempt to use the "json" tag if
+// it exists when the "yaml" tag does not
+func MarshalJSON(in interface{}) (out []byte, err error) {
+	defer handleErr(&err)
+	e := newEncoder()
+	e.json = true
 	defer e.destroy()
 	e.marshalDoc("", reflect.ValueOf(in))
 	e.finish()
