@@ -317,6 +317,7 @@ type decoder struct {
 
 	knownFields bool
 	uniqueKeys  bool
+	json        bool
 	decodeCount int
 	aliasCount  int
 	aliasDepth  int
@@ -852,7 +853,7 @@ func isStringMap(n *Node) bool {
 }
 
 func (d *decoder) mappingStruct(n *Node, out reflect.Value) (good bool) {
-	sinfo, err := getStructInfo(out.Type())
+	sinfo, err := getStructInfo(out.Type(), d.json)
 	if err != nil {
 		panic(err)
 	}

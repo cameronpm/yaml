@@ -35,6 +35,7 @@ type encoder struct {
 	flow     bool
 	indent   int
 	doneInit bool
+	json     bool
 }
 
 func newEncoder() *encoder {
@@ -212,7 +213,7 @@ func (e *encoder) fieldByIndex(v reflect.Value, index []int) (field reflect.Valu
 }
 
 func (e *encoder) structv(tag string, in reflect.Value) {
-	sinfo, err := getStructInfo(in.Type())
+	sinfo, err := getStructInfo(in.Type(), e.json)
 	if err != nil {
 		panic(err)
 	}

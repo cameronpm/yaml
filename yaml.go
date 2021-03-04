@@ -93,6 +93,7 @@ func Unmarshal(in []byte, out interface{}) (err error) {
 type Decoder struct {
 	parser      *parser
 	knownFields bool
+	json        bool
 }
 
 // NewDecoder returns a new decoder that reads from r.
@@ -111,6 +112,12 @@ func (dec *Decoder) KnownFields(enable bool) {
 	dec.knownFields = enable
 }
 
+// JSONTag indicates to use a JSON tag as a backup if there is no YAML tag.
+// False by default.
+func (dec *Decoder) JSONTag(use bool) {
+	dec.json = use
+}
+
 // Decode reads the next YAML-encoded value from its input
 // and stores it in the value pointed to by v.
 //
@@ -118,6 +125,7 @@ func (dec *Decoder) KnownFields(enable bool) {
 // conversion of YAML into a Go value.
 func (dec *Decoder) Decode(v interface{}) (err error) {
 	d := newDecoder()
+	d.json = dec.json
 	d.knownFields = dec.knownFields
 	defer handleErr(&err)
 	node := dec.parser.parse()
@@ -278,6 +286,12 @@ func (e *Encoder) SetIndent(spaces int) {
 	e.encoder.indent = spaces
 }
 
+// JSONTag indicates to use a JSON tag as a backup if there is no YAML tag.
+// False by default.
+func (e *Encoder) JSONTag(use bool) {
+	e.encoder.json = use
+}
+
 // Close closes the encoder by writing any remaining data.
 // It does not write a stream terminating string "...".
 func (e *Encoder) Close() (err error) {
@@ -363,7 +377,7 @@ const (
 //             Address yaml.Node
 //     }
 //     err := yaml.Unmarshal(data, &person)
-// 
+//
 // Or by itself:
 //
 //     var person Node
@@ -373,7 +387,7 @@ type Node struct {
 	// Kind defines whether the node is a document, a mapping, a sequence,
 	// a scalar value, or an alias to another node. The specific data type of
 	// scalar nodes may be obtained via the ShortTag and LongTag methods.
-	Kind  Kind
+	Kind Kind
 
 	// Style allows customizing the apperance of the node in the tree.
 	Style Style
@@ -420,7 +434,6 @@ func (n *Node) IsZero() bool {
 	return n.Kind == 0 && n.Style == 0 && n.Tag == "" && n.Value == "" && n.Anchor == "" && n.Alias == nil && n.Content == nil &&
 		n.HeadComment == "" && n.LineComment == "" && n.FootComment == "" && n.Line == 0 && n.Column == 0
 }
-
 
 // LongTag returns the long form of the tag that indicates the data type for
 // the node. If the Tag field isn't explicitly defined, one will be computed
@@ -524,7 +537,7 @@ func init() {
 	unmarshalerType = reflect.ValueOf(&v).Elem().Type()
 }
 
-func getStructInfo(st reflect.Type) (*structInfo, error) {
+func getStructInfo(st reflect.Type, json bool) (*structInfo, error) {
 	fieldMapMutex.RLock()
 	sinfo, found := structMap[st]
 	fieldMapMutex.RUnlock()
@@ -546,6 +559,9 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 		info := fieldInfo{Num: i}
 
 		tag := field.Tag.Get("yaml")
+		if tag == "" && json {
+			tag = field.Tag.Get("json")
+		}
 		if tag == "" && strings.Index(string(field.Tag), ":") < 0 {
 			tag = string(field.Tag)
 		}
@@ -592,7 +608,7 @@ func getStructInfo(st reflect.Type) (*structInfo, error) {
 				if reflect.PtrTo(ftype).Implements(unmarshalerType) {
 					inlineUnmarshalers = append(inlineUnmarshalers, []int{i})
 				} else {
-					sinfo, err := getStructInfo(ftype)
+					sinfo, err := getStructInfo(ftype, json)
 					if err != nil {
 						return nil, err
 					}
